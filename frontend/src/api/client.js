@@ -34,6 +34,11 @@ export async function fetchGroups(sessionId) {
   return handleResponse(response)
 }
 
+export async function fetchStudents(sessionId) {
+  const response = await fetch(`${API_BASE}/sessions/${sessionId}/students`)
+  return handleResponse(response)
+}
+
 export async function fetchGroup(sessionId, groupName) {
   const response = await fetch(
     `${API_BASE}/sessions/${sessionId}/groups/${encodeURIComponent(groupName)}`,

@@ -4,8 +4,63 @@ from typing import Annotated, Any
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from models import GroupDetail, GroupSummary, MemberFeedback, MemberInfo, UploadResponse
+from models import (
+    GroupDetail,
+    GroupSummary,
+    MemberFeedback,
+    MemberInfo,
+    RatingAverages,
+    StudentSummary,
+    UploadResponse,
+)
 from parser import parse_with_master_list
+
+CRITERIA_KEYS = ("participation", "dependability", "wellbeing", "work_contribution")
+
+
+def _score_from_rating(rating: str | None) -> float | None:
+    if not rating:
+        return None
+    digits = []
+    for char in rating.strip():
+        if char.isdigit():
+            digits.append(char)
+        else:
+            break
+    if not digits:
+        return None
+    return float("".join(digits))
+
+
+def _compute_averages(reviews: list[dict]) -> RatingAverages:
+    buckets: dict[str, list[float]] = {key: [] for key in CRITERIA_KEYS}
+    for review in reviews:
+        for key in CRITERIA_KEYS:
+            criterion = review.get(key) or {}
+            score = _score_from_rating(criterion.get("rating"))
+            if score is not None:
+                buckets[key].append(score)
+
+    averages: dict[str, float | None] = {}
+    collected: list[float] = []
+    for key in CRITERIA_KEYS:
+        values = buckets[key]
+        if values:
+            avg = round(sum(values) / len(values), 2)
+            averages[key] = avg
+            collected.append(avg)
+        else:
+            averages[key] = None
+
+    overall = round(sum(collected) / len(collected), 2) if collected else None
+    return RatingAverages(
+        participation=averages["participation"],
+        dependability=averages["dependability"],
+        wellbeing=averages["wellbeing"],
+        work_contribution=averages["work_contribution"],
+        overall=overall,
+        review_count=len(reviews),
+    )
 
 app = FastAPI(title="Feedback Analyzer API")
 
@@ -110,6 +165,25 @@ def list_groups(session_id: str):
     return summaries
 
 
+@app.get("/api/sessions/{session_id}/students", response_model=list[StudentSummary])
+def list_students(session_id: str):
+    session = _get_session(session_id)
+    students: list[StudentSummary] = []
+    for group_name, group in session["groups"].items():
+        for member in group["members"].values():
+            students.append(
+                StudentSummary(
+                    zid=member["zid"],
+                    name=member.get("name"),
+                    email=member.get("email"),
+                    group=group_name,
+                    submitted=member.get("submitted", False),
+                )
+            )
+    students.sort(key=lambda item: ((item.name or "").lower(), item.zid))
+    return students
+
+
 @app.get("/api/sessions/{session_id}/groups/{group_name}", response_model=GroupDetail)
 def get_group(session_id: str, group_name: str):
     session = _get_session(session_id)
@@ -117,17 +191,29 @@ def get_group(session_id: str, group_name: str):
     if not group:
         raise HTTPException(status_code=404, detail="Group not found.")
 
-    members = [
-        MemberInfo(**{k: v for k, v in member.items() if k in MemberInfo.model_fields})
-        for member in sorted(
-            group["members"].values(),
-            key=lambda item: (
-                not item["submitted"],
-                item.get("name") or "",
-                item["zid"],
-            ),
+    member_rows: list[MemberInfo] = []
+    for member in group["members"].values():
+        reviews = group["feedback_received"].get(member["zid"], [])
+        averages = _compute_averages(reviews)
+        member_rows.append(
+            MemberInfo(
+                zid=member["zid"],
+                name=member.get("name"),
+                email=member.get("email"),
+                submitted=member.get("submitted", False),
+                averages=averages,
+            )
         )
-    ]
+
+    member_rows.sort(
+        key=lambda item: (
+            item.averages.overall is None,
+            -(item.averages.overall or 0),
+            item.name or "",
+            item.zid,
+        )
+    )
+
     unidentified = [
         MemberInfo(
             zid=member["zid"],
@@ -135,13 +221,14 @@ def get_group(session_id: str, group_name: str):
             email=member.get("email"),
             submitted=False,
             noted_by=member.get("noted_by"),
+            averages=_compute_averages(group["feedback_received"].get(member["zid"], [])),
         )
         for member in sorted(
             group.get("unidentified_members", {}).values(),
             key=lambda item: item["zid"],
         )
     ]
-    return GroupDetail(name=group_name, members=members, unidentified_members=unidentified)
+    return GroupDetail(name=group_name, members=member_rows, unidentified_members=unidentified)
 
 
 @app.get(

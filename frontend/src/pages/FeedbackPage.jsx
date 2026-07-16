@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { fetchMemberFeedback } from '../api/client'
 import FeedbackCard from '../components/FeedbackCard'
 import Layout from '../components/Layout'
+import { clearFeedbackSession, isSessionExpiredError } from '../utils/session'
 
 export default function FeedbackPage() {
   const { groupName, zid } = useParams()
@@ -26,6 +27,11 @@ export default function FeedbackPage() {
         const result = await fetchMemberFeedback(sessionId, decodedGroup, zid)
         setData(result)
       } catch (err) {
+        if (isSessionExpiredError(err.message)) {
+          clearFeedbackSession()
+          navigate('/', { replace: true })
+          return
+        }
         setError(err.message)
       } finally {
         setLoading(false)

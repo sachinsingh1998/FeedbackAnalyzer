@@ -1,22 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-export default function GroupSearchSelect({
-  groups,
-  value,
-  onChange,
+export default function StudentSearchSelect({
+  students,
+  onSelect,
   disabled = false,
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const containerRef = useRef(null)
 
-  const selected = groups.find((group) => group.name === value)
-
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return groups
-    return groups.filter((group) => group.name.toLowerCase().includes(q))
-  }, [groups, query])
+    const q = query.trim().toLowerCase().replace(/^z/, '')
+    if (!q) return students.slice(0, 40)
+    return students
+      .filter((student) => {
+        const name = (student.name || '').toLowerCase()
+        const zid = student.zid.toLowerCase()
+        const email = (student.email || '').toLowerCase()
+        return (
+          name.includes(q) ||
+          zid.includes(q) ||
+          `z${zid}`.includes(query.trim().toLowerCase()) ||
+          email.includes(q)
+        )
+      })
+      .slice(0, 40)
+  }, [students, query])
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -28,29 +37,18 @@ export default function GroupSearchSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function handleSelect(groupName) {
-    onChange(groupName)
+  function handleSelect(student) {
+    onSelect(student)
     setOpen(false)
     setQuery('')
   }
 
   return (
     <div className={`search-box ${open ? 'open' : ''}`} ref={containerRef}>
-      {selected && (
-        <div className="search-box-current">
-          <p className="search-box-current-label">Current group</p>
-          <p className="search-box-current-name">{selected.name}</p>
-          <p className="search-box-current-meta">
-            {selected.submitted_count}/{selected.member_count} submitted
-          </p>
-        </div>
-      )}
-
       <input
-        id="group-search"
         type="text"
         className="search-box-input"
-        placeholder="Search groups…"
+        placeholder="Search student by name or zID…"
         value={query}
         disabled={disabled}
         autoComplete="off"
@@ -62,7 +60,7 @@ export default function GroupSearchSelect({
         onKeyDown={(event) => {
           if (event.key === 'Escape') setOpen(false)
           if (event.key === 'Enter' && filtered.length === 1) {
-            handleSelect(filtered[0].name)
+            handleSelect(filtered[0])
           }
         }}
       />
@@ -72,21 +70,24 @@ export default function GroupSearchSelect({
           <div className="search-box-list" role="listbox">
             {filtered.length === 0 ? (
               <p className="search-box-empty">
-                {groups.length === 0 ? 'No groups loaded yet.' : `No groups match “${query}”`}
+                {students.length === 0
+                  ? 'No students loaded yet.'
+                  : `No students match “${query}”`}
               </p>
             ) : (
-              filtered.map((group) => (
+              filtered.map((student) => (
                 <button
-                  key={group.name}
+                  key={`${student.group}-${student.zid}`}
                   type="button"
-                  className={`search-box-option ${group.name === value ? 'active' : ''}`}
+                  className="search-box-option"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => handleSelect(group.name)}
+                  onClick={() => handleSelect(student)}
                 >
-                  <span className="search-option-name">{group.name}</span>
-                  <span className="search-option-meta">
-                    {group.submitted_count}/{group.member_count} submitted
+                  <span className="search-option-name">
+                    {student.name || `z${student.zid}`}
+                    <span className="student-option-zid">z{student.zid}</span>
                   </span>
+                  <span className="search-option-meta">{student.group}</span>
                 </button>
               ))
             )}

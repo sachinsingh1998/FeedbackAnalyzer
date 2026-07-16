@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadCsv } from '../api/client'
 import Layout from '../components/Layout'
+import { clearFeedbackSession } from '../utils/session'
 
 function FilePicker({ label, hint, file, onChange }) {
   return (
@@ -40,6 +41,7 @@ export default function UploadPage() {
     setError('')
     try {
       const result = await uploadCsv(peerFile, masterFile)
+      clearFeedbackSession()
       sessionStorage.setItem('feedbackSessionId', result.session_id)
       sessionStorage.setItem('feedbackFilename', result.filename)
       navigate('/groups')
