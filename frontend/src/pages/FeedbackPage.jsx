@@ -37,11 +37,14 @@ export default function FeedbackPage() {
 
   const displayName = data?.name || 'Not found'
   const hasDetails = Boolean(data?.name)
+  const subtitle = data?.unidentified
+    ? `Group ${decodedGroup} · Unidentified zID · Feedback received`
+    : `Group ${decodedGroup} · Feedback received`
 
   return (
     <Layout
       title={hasDetails ? displayName : `Member z${zid}`}
-      subtitle={`Group ${decodedGroup} · Feedback received`}
+      subtitle={subtitle}
       backTo="/groups"
       backLabel="Groups"
     >
@@ -60,8 +63,14 @@ export default function FeedbackPage() {
             <p className="summary-value">{data?.email || 'Not found'}</p>
           </div>
           <div>
-            <p className="summary-label">Form submission</p>
-            <p className="summary-value">{data?.submitted ? 'Submitted' : 'Not found'}</p>
+            <p className="summary-label">Status</p>
+            <p className="summary-value">
+              {data?.unidentified
+                ? 'Unidentified'
+                : data?.submitted
+                  ? 'Submitted'
+                  : 'No submission'}
+            </p>
           </div>
         </div>
       </section>

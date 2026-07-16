@@ -138,6 +138,15 @@ a {
   font-size: 2rem;
 }
 
+.file-label-title {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
+}
+
 .file-title {
   margin: 10px 0 6px;
   font-size: 1.05rem;
@@ -383,6 +392,17 @@ a {
   font-weight: 600;
 }
 
+.chip-warn {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.section-note {
+  margin: 0 0 14px;
+  color: #64748b;
+  font-size: 0.92rem;
+}
+
 .member-list {
   display: grid;
   gap: 12px;
@@ -448,6 +468,10 @@ a {
   gap: 16px;
 }
 
+.summary-grid > div {
+  min-width: 0;
+}
+
 .summary-label {
   margin: 0 0 4px;
   color: #64748b;
@@ -460,6 +484,8 @@ a {
 .summary-value {
   margin: 0;
   font-weight: 700;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .feedback-stack {

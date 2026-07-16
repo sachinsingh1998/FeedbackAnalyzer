@@ -6,6 +6,7 @@ class MemberInfo(BaseModel):
     name: str | None = None
     email: str | None = None
     submitted: bool = False
+    noted_by: list[str] | None = None
 
 
 class CriterionFeedback(BaseModel):
@@ -27,6 +28,7 @@ class MemberFeedback(BaseModel):
     name: str | None = None
     email: str | None = None
     submitted: bool
+    unidentified: bool = False
     reviews: list[ReviewEntry]
     given_reviews: list[dict] | None = None
 
@@ -35,11 +37,13 @@ class GroupSummary(BaseModel):
     name: str
     member_count: int
     submitted_count: int
+    unidentified_count: int = 0
 
 
 class GroupDetail(BaseModel):
     name: str
     members: list[MemberInfo]
+    unidentified_members: list[MemberInfo] = []
 
 
 class UploadResponse(BaseModel):
@@ -47,3 +51,5 @@ class UploadResponse(BaseModel):
     group_count: int
     submission_count: int
     filename: str
+    master_filename: str | None = None
+    unmatched_reviewers: int = 0

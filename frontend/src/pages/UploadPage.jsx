@@ -3,23 +3,43 @@ import { useNavigate } from 'react-router-dom'
 import { uploadCsv } from '../api/client'
 import Layout from '../components/Layout'
 
+function FilePicker({ label, hint, file, onChange }) {
+  return (
+    <label className="file-dropzone">
+      <input
+        type="file"
+        accept=".csv"
+        onChange={(event) => onChange(event.target.files?.[0] || null)}
+      />
+      <div className="file-dropzone-content">
+        <p className="file-label-title">{label}</p>
+        <p className="file-title">
+          {file ? file.name : 'Drop CSV here or click to browse'}
+        </p>
+        <p className="file-hint">{hint}</p>
+      </div>
+    </label>
+  )
+}
+
 export default function UploadPage() {
   const navigate = useNavigate()
-  const [file, setFile] = useState(null)
+  const [peerFile, setPeerFile] = useState(null)
+  const [masterFile, setMasterFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleUpload(event) {
     event.preventDefault()
-    if (!file) {
-      setError('Please choose a CSV file to upload.')
+    if (!peerFile || !masterFile) {
+      setError('Please upload both the peer evaluation CSV and the master list CSV.')
       return
     }
 
     setLoading(true)
     setError('')
     try {
-      const result = await uploadCsv(file)
+      const result = await uploadCsv(peerFile, masterFile)
       sessionStorage.setItem('feedbackSessionId', result.session_id)
       sessionStorage.setItem('feedbackFilename', result.filename)
       navigate('/groups')
@@ -30,34 +50,37 @@ export default function UploadPage() {
     }
   }
 
+  const ready = Boolean(peerFile && masterFile)
+
   return (
     <Layout
-      title="Upload Peer Evaluation CSV"
-      subtitle="Upload the exported Microsoft Forms CSV to begin reviewing group feedback."
+      title="Upload evaluation files"
+      subtitle="Upload the Interim Peer Evaluation CSV and the Master List CSV. Groups are taken from the master list."
     >
       <section className="panel upload-panel">
         <form onSubmit={handleUpload} className="upload-form">
-          <label className="file-dropzone">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(event) => {
-                setFile(event.target.files?.[0] || null)
-                setError('')
-              }}
-            />
-            <div className="file-dropzone-content">
-              <span className="file-icon">📄</span>
-              <p className="file-title">
-                {file ? file.name : 'Drop your CSV here or click to browse'}
-              </p>
-              <p className="file-hint">Supports peer evaluation exports with group and rating columns.</p>
-            </div>
-          </label>
+          <FilePicker
+            label="1. Peer evaluation CSV"
+            hint="Microsoft Forms interim peer evaluation export"
+            file={peerFile}
+            onChange={(file) => {
+              setPeerFile(file)
+              setError('')
+            }}
+          />
+          <FilePicker
+            label="2. Master list CSV"
+            hint="Student master list with Current Group (ground truth)"
+            file={masterFile}
+            onChange={(file) => {
+              setMasterFile(file)
+              setError('')
+            }}
+          />
 
           {error && <p className="error-banner">{error}</p>}
 
-          <button type="submit" className="btn btn-primary" disabled={loading || !file}>
+          <button type="submit" className="btn btn-primary" disabled={loading || !ready}>
             {loading ? 'Processing…' : 'Feedback'}
           </button>
         </form>

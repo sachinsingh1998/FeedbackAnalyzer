@@ -37,11 +37,13 @@ App runs at `http://localhost:5173`.
 
 ## Usage flow
 
-1. Open the upload page and select a CSV file.
+1. Open the upload page and select **both** CSV files:
+   - Interim peer evaluation export
+   - Master list (with `Current Group` as ground truth)
 2. Click **Feedback** to go to the group overview page.
-3. Choose a group from the dropdown.
-4. Click a student name to view feedback they received.
-5. Click another student name on the feedback page to navigate between members.
+3. Groups and member details come from the **master list**. Peer form group names are ignored.
+4. Incorrect teammate zIDs appear under **Unidentified team members**.
+5. Click a student name to view feedback they received.
 6. Use **Back** buttons to return to Groups or Upload.
 
 ## Notes

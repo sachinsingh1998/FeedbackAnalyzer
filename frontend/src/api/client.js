@@ -3,14 +3,25 @@ const API_BASE = '/api'
 async function handleResponse(response) {
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
-    throw new Error(payload.detail || 'Request failed')
+    const detail = payload.detail
+    if (typeof detail === 'string') {
+      throw new Error(detail)
+    }
+    if (Array.isArray(detail)) {
+      const message = detail
+        .map((item) => item.msg || JSON.stringify(item))
+        .join('; ')
+      throw new Error(message || `Request failed (${response.status})`)
+    }
+    throw new Error(`Request failed (${response.status})`)
   }
   return response.json()
 }
 
-export async function uploadCsv(file) {
+export async function uploadCsv(peerFile, masterFile) {
   const formData = new FormData()
-  formData.append('file', file)
+  formData.append('peer_file', peerFile, peerFile.name)
+  formData.append('master_file', masterFile, masterFile.name)
   const response = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
     body: formData,
