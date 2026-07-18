@@ -1,25 +1,34 @@
 import { CRITERIA } from '../utils/ratings'
 import RatingBadge from './RatingBadge'
 
-export default function FeedbackCard({ review, groupName, sessionId, LinkComponent }) {
+export default function FeedbackCard({ review, groupName, LinkComponent, mode = 'received' }) {
   const Link = LinkComponent
+  const isGiven = mode === 'given'
+  const personZid = isGiven ? review.target_zid : review.reviewer_zid
+  const personName = isGiven ? review.target_name : review.reviewer_name
+  const headerLabel = isGiven ? 'Feedback for' : 'Feedback from'
 
   return (
     <article className="feedback-card">
       <header className="feedback-card-header">
         <div>
-          <p className="feedback-label">Feedback from</p>
-          {review.reviewer_name ? (
+          <p className="feedback-label">{headerLabel}</p>
+          {personName ? (
             <Link
-              to={`/feedback/${encodeURIComponent(groupName)}/${review.reviewer_zid}`}
+              to={`/feedback/${encodeURIComponent(groupName)}/${personZid}`}
               className="member-link"
             >
-              {review.reviewer_name}
+              {personName}
             </Link>
           ) : (
-            <p className="member-name">z{review.reviewer_zid}</p>
+            <Link
+              to={`/feedback/${encodeURIComponent(groupName)}/${personZid}`}
+              className="member-link"
+            >
+              z{personZid}
+            </Link>
           )}
-          <p className="member-meta">z{review.reviewer_zid}</p>
+          <p className="member-meta">z{personZid}</p>
         </div>
       </header>
 

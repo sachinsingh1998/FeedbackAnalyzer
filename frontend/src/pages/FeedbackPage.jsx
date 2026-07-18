@@ -13,6 +13,7 @@ export default function FeedbackPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('received')
 
   useEffect(() => {
     if (!sessionId) {
@@ -39,6 +40,7 @@ export default function FeedbackPage() {
     }
 
     loadFeedback()
+    setActiveTab('received')
   }, [sessionId, decodedGroup, zid, navigate])
 
   const displayName = data?.name || 'Not found'
@@ -84,56 +86,68 @@ export default function FeedbackPage() {
       {error && <p className="error-banner">{error}</p>}
 
       <section className="panel">
-        <div className="panel-heading">
-          <h2>Feedback Received</h2>
-          {data && <span className="chip">{data.reviews.length} reviews</span>}
+        <div className="tab-bar" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'received'}
+            className={`tab-button ${activeTab === 'received' ? 'active' : ''}`}
+            onClick={() => setActiveTab('received')}
+          >
+            Feedback Received
+            {data && <span className="tab-count">{data.reviews.length}</span>}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'given'}
+            className={`tab-button ${activeTab === 'given' ? 'active' : ''}`}
+            onClick={() => setActiveTab('given')}
+          >
+            Feedback Given
+            {data?.given_reviews && (
+              <span className="tab-count">{data.given_reviews.length}</span>
+            )}
+          </button>
         </div>
 
         {loading ? (
           <p className="loading-text">Loading feedback…</p>
-        ) : !data || data.reviews.length === 0 ? (
-          <p className="empty-text">Not found — no feedback received for this member.</p>
+        ) : activeTab === 'received' ? (
+          !data || data.reviews.length === 0 ? (
+            <p className="empty-text">Not found — no feedback received for this member.</p>
+          ) : (
+            <div className="feedback-stack">
+              {data.reviews.map((review, index) => (
+                <FeedbackCard
+                  key={`${review.reviewer_zid}-${index}`}
+                  review={review}
+                  groupName={decodedGroup}
+                  LinkComponent={Link}
+                />
+              ))}
+            </div>
+          )
+        ) : !data?.submitted || !data.given_reviews || data.given_reviews.length === 0 ? (
+          <p className="empty-text">
+            {data?.submitted
+              ? 'No feedback given by this member.'
+              : 'Not found — this member did not submit the peer evaluation form.'}
+          </p>
         ) : (
           <div className="feedback-stack">
-            {data.reviews.map((review, index) => (
+            {data.given_reviews.map((review, index) => (
               <FeedbackCard
-                key={`${review.reviewer_zid}-${index}`}
+                key={`given-${review.target_zid}-${index}`}
                 review={review}
                 groupName={decodedGroup}
-                sessionId={sessionId}
                 LinkComponent={Link}
+                mode="given"
               />
             ))}
           </div>
         )}
       </section>
-
-      {data?.submitted && data.given_reviews && (
-        <section className="panel">
-          <div className="panel-heading">
-            <h2>Feedback Given</h2>
-            <span className="chip">{data.given_reviews.length} reviews</span>
-          </div>
-          <div className="feedback-stack">
-            {data.given_reviews.map((review, index) => (
-              <article key={`given-${review.target_zid}-${index}`} className="feedback-card compact">
-                <header className="feedback-card-header">
-                  <div>
-                    <p className="feedback-label">Reviewed</p>
-                    <Link
-                      to={`/feedback/${encodeURIComponent(decodedGroup)}/${review.target_zid}`}
-                      className="member-link"
-                    >
-                      {review.target_name || 'Not found'}
-                    </Link>
-                    <p className="member-meta">z{review.target_zid}</p>
-                  </div>
-                </header>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
     </Layout>
   )
 }

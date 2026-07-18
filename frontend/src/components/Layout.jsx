@@ -8,7 +8,7 @@ export default function Layout({ title, subtitle, backTo, backLabel = 'Back', ch
           <span className="brand-mark">FA</span>
           <div>
             <p className="brand-title">Feedback Analyzer</p>
-            <p className="brand-subtitle">Peer evaluation insights for tutors</p>
+            <p className="brand-subtitle">Peer evaluation analyzer for tutors</p>
           </div>
         </div>
         {backTo && (

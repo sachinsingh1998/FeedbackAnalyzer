@@ -15,7 +15,7 @@ function FilePicker({ label, hint, file, onChange }) {
       <div className="file-dropzone-content">
         <p className="file-label-title">{label}</p>
         <p className="file-title">
-          {file ? file.name : 'Drop CSV here or click to browse'}
+          {file ? file.name : 'Drop CSV file here or click to browse'}
         </p>
         <p className="file-hint">{hint}</p>
       </div>
@@ -63,7 +63,7 @@ export default function UploadPage() {
         <form onSubmit={handleUpload} className="upload-form">
           <FilePicker
             label="1. Peer evaluation CSV"
-            hint="Microsoft Forms interim peer evaluation export"
+            hint="Microsoft Forms interim peer evaluation report (in CSV format)"
             file={peerFile}
             onChange={(file) => {
               setPeerFile(file)
@@ -72,7 +72,7 @@ export default function UploadPage() {
           />
           <FilePicker
             label="2. Master list CSV"
-            hint="Student master list with Current Group (ground truth)"
+            hint="Student master list with Current allocated Group (ground truth)"
             file={masterFile}
             onChange={(file) => {
               setMasterFile(file)
@@ -83,7 +83,7 @@ export default function UploadPage() {
           {error && <p className="error-banner">{error}</p>}
 
           <button type="submit" className="btn btn-primary" disabled={loading || !ready}>
-            {loading ? 'Processing…' : 'Feedback'}
+            {loading ? 'Processing…' : 'Analyze'}
           </button>
         </form>
       </section>
