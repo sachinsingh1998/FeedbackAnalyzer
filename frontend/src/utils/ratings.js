@@ -10,6 +10,15 @@ export function getRatingStyle(rating) {
     return { background: '#e2e8f0', color: '#475569', label: rating }
   }
 
+  return { ...getScoreStyle(score), label: rating }
+}
+
+export function getScoreStyle(score) {
+  if (score == null || Number.isNaN(score)) {
+    return { background: '#e2e8f0', color: '#475569' }
+  }
+
+  const rounded = Math.round(score)
   const palette = {
     1: { background: '#fee2e2', color: '#991b1b' },
     2: { background: '#ffedd5', color: '#9a3412' },
@@ -20,8 +29,7 @@ export function getRatingStyle(rating) {
     7: { background: '#dbeafe', color: '#1e40af' },
   }
 
-  const colors = palette[score] || { background: '#e2e8f0', color: '#475569' }
-  return { ...colors, label: rating }
+  return palette[rounded] || { background: '#e2e8f0', color: '#475569' }
 }
 
 export const CRITERIA = [
