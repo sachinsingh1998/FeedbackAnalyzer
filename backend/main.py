@@ -1,3 +1,4 @@
+import os
 import uuid
 from typing import Annotated, Any
 
@@ -64,9 +65,22 @@ def _compute_averages(reviews: list[dict]) -> RatingAverages:
 
 app = FastAPI(title="Feedback Analyzer API")
 
+# Local dev origins are always allowed. Additional production origins can be
+# supplied via the ALLOWED_ORIGINS env var (comma-separated list of URLs).
+_DEFAULT_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+_extra_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+ALLOWED_ORIGINS = _DEFAULT_ORIGINS + _extra_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5173/"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

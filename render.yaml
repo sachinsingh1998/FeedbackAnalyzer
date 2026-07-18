@@ -1,0 +1,16 @@
+# Render blueprint for the Feedback Analyzer FastAPI backend.
+# Deploy at https://render.com -> New -> Blueprint -> point at this repo.
+services:
+  - type: web
+    name: feedback-analyzer-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      # Comma-separated list of allowed frontend origins, e.g.
+      # https://feedback-analyzer.vercel.app,https://your-site.netlify.app
+      - key: ALLOWED_ORIGINS
+        sync: false
