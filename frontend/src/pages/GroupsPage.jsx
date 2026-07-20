@@ -162,7 +162,6 @@ export default function GroupsPage() {
           navigate('/', { replace: true })
           return
         }
-        // Keep cached students/groups if refresh fails.
         if (loadCachedStudents(sessionId).length === 0) {
           setError(err.message)
         }
@@ -217,7 +216,7 @@ export default function GroupsPage() {
   return (
     <Layout
       title="Group Overview"
-      subtitle={filename ? `Analyzing ${filename}` : 'Select a group to inspect member feedback.'}
+      subtitle={filename ? filename : 'Pick a group'}
       backTo="/"
       backLabel="Upload"
     >
@@ -250,7 +249,7 @@ export default function GroupsPage() {
         )}
         {!loadingGroups && students.length === 0 && (
           <p className="loading-text" style={{ marginTop: 12 }}>
-            Student search list is empty — open a group once, or re-upload the CSVs.
+            Student list empty — try re-uploading the CSVs.
           </p>
         )}
       </section>
@@ -264,7 +263,7 @@ export default function GroupsPage() {
             <span className="chip">{members.length} members</span>
           )}
         </div>
-        <p className="section-note">Sorted by overall average rating (highest first).</p>
+        <p className="section-note">Sorted by overall average.</p>
 
         {!selectedGroup ? (
           <p className="empty-text">Select a group to view members.</p>
@@ -284,7 +283,7 @@ export default function GroupsPage() {
             <span className="chip chip-warn">{unidentified.length} found</span>
           </div>
           <p className="section-note">
-            These zIDs were entered by someone in this group but are not on the master list for this group.
+            zIDs entered in the form that are not on this group's master list.
           </p>
           <MemberTable members={unidentified} groupName={selectedGroup} unidentified />
         </section>

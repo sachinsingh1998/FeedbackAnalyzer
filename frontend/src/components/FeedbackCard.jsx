@@ -42,7 +42,7 @@ export default function FeedbackCard({ review, groupName, LinkComponent, mode = 
                 <RatingBadge rating={criterion.rating} />
               </div>
               <p className="criterion-comment">
-                {criterion.comment || 'No comment provided.'}
+                {criterion.comment || '—'}
               </p>
             </section>
           )

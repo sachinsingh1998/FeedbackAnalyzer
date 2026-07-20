@@ -63,10 +63,8 @@ def _compute_averages(reviews: list[dict]) -> RatingAverages:
         review_count=len(reviews),
     )
 
-app = FastAPI(title="Feedback Analyzer API")
+app = FastAPI()
 
-# Local dev origins are always allowed. Additional production origins can be
-# supplied via the ALLOWED_ORIGINS env var (comma-separated list of URLs).
 _DEFAULT_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -108,8 +106,8 @@ def health_check():
 
 @app.post("/api/upload", response_model=UploadResponse)
 async def upload_csv(
-    peer_file: Annotated[UploadFile, File(description="Interim peer evaluation CSV")],
-    master_file: Annotated[UploadFile, File(description="Master list CSV with Current Group")],
+    peer_file: Annotated[UploadFile, File()],
+    master_file: Annotated[UploadFile, File()],
 ):
     _require_csv(peer_file, "peer evaluation")
     _require_csv(master_file, "master list")
@@ -264,20 +262,15 @@ def get_member_feedback(session_id: str, group_name: str, zid: str):
         raise HTTPException(status_code=404, detail="Member not found in this group.")
 
     reviews = group["feedback_received"].get(zid, [])
-    given_reviews = group["feedback_given"].get(zid)
-    enriched_given = None
-    if member.get("submitted") and given_reviews is not None:
-        enriched_given = []
-        for review in given_reviews:
+    given_reviews = None
+    raw_given = group["feedback_given"].get(zid)
+    if member.get("submitted") and raw_given is not None:
+        given_reviews = []
+        for review in raw_given:
             target = group["members"].get(review["target_zid"]) or group.get(
                 "unidentified_members", {}
             ).get(review["target_zid"], {})
-            enriched_given.append(
-                {
-                    **review,
-                    "target_name": target.get("name"),
-                }
-            )
+            given_reviews.append({**review, "target_name": target.get("name")})
 
     return MemberFeedback(
         zid=zid,
@@ -286,5 +279,5 @@ def get_member_feedback(session_id: str, group_name: str, zid: str):
         submitted=member.get("submitted", False),
         unidentified=unidentified,
         reviews=reviews,
-        given_reviews=enriched_given,
+        given_reviews=given_reviews,
     )

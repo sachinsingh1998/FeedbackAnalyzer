@@ -57,13 +57,13 @@ export default function UploadPage() {
   return (
     <Layout
       title="Upload evaluation files"
-      subtitle="Upload the Interim Peer Evaluation CSV and the Master List CSV. Groups are taken from the master list."
+      subtitle="Upload the peer eval CSV and master list. Groups are from the master list."
     >
       <section className="panel upload-panel">
         <form onSubmit={handleUpload} className="upload-form">
           <FilePicker
             label="1. Peer evaluation CSV"
-            hint="Microsoft Forms interim peer evaluation report (in CSV format)"
+            hint="Microsoft Forms export"
             file={peerFile}
             onChange={(file) => {
               setPeerFile(file)
@@ -72,7 +72,7 @@ export default function UploadPage() {
           />
           <FilePicker
             label="2. Master list CSV"
-            hint="Student master list with Current allocated Group (ground truth)"
+            hint="Master list with Current Group column"
             file={masterFile}
             onChange={(file) => {
               setMasterFile(file)
@@ -83,7 +83,7 @@ export default function UploadPage() {
           {error && <p className="error-banner">{error}</p>}
 
           <button type="submit" className="btn btn-primary" disabled={loading || !ready}>
-            {loading ? 'Processing…' : 'Analyze'}
+            {loading ? 'Uploading…' : 'Continue'}
           </button>
         </form>
       </section>

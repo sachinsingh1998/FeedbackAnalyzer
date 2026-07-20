@@ -3,17 +3,7 @@ const API_BASE = '/api'
 async function handleResponse(response) {
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}))
-    const detail = payload.detail
-    if (typeof detail === 'string') {
-      throw new Error(detail)
-    }
-    if (Array.isArray(detail)) {
-      const message = detail
-        .map((item) => item.msg || JSON.stringify(item))
-        .join('; ')
-      throw new Error(message || `Request failed (${response.status})`)
-    }
-    throw new Error(`Request failed (${response.status})`)
+    throw new Error(payload.detail || `Request failed (${response.status})`)
   }
   return response.json()
 }

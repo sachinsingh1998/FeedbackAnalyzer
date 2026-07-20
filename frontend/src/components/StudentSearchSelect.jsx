@@ -67,7 +67,7 @@ export default function StudentSearchSelect({
 
       {open && !disabled && (
         <div className="search-box-dropdown">
-          <div className="search-box-list" role="listbox">
+          <div className="search-box-list">
             {filtered.length === 0 ? (
               <p className="search-box-empty">
                 {students.length === 0
