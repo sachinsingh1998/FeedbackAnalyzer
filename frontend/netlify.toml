@@ -1,21 +1,14 @@
-# Netlify config for the Feedback Analyzer frontend.
-# Set "Base directory" to `frontend` in the Netlify UI, or deploy from repo root
-# with this file (base is declared below).
-
 [build]
   base = "frontend"
   command = "npm run build"
   publish = "dist"
 
-# Proxy API calls to the persistent backend (Render/Railway/etc).
-# Replace REPLACE_WITH_BACKEND_URL with your deployed backend host.
 [[redirects]]
   from = "/api/*"
   to = "https://feedbackanalyzer-sk3h.onrender.com/api/:splat"
   status = 200
   force = true
 
-# SPA fallback so React Router routes resolve on refresh / deep links.
 [[redirects]]
   from = "/*"
   to = "/index.html"

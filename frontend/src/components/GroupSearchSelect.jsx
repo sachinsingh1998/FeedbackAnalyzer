@@ -69,7 +69,7 @@ export default function GroupSearchSelect({
 
       {open && !disabled && (
         <div className="search-box-dropdown">
-          <div className="search-box-list" role="listbox">
+          <div className="search-box-list">
             {filtered.length === 0 ? (
               <p className="search-box-empty">
                 {groups.length === 0 ? 'No groups loaded yet.' : `No groups match “${query}”`}

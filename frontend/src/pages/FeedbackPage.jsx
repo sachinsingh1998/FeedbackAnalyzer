@@ -86,11 +86,9 @@ export default function FeedbackPage() {
       {error && <p className="error-banner">{error}</p>}
 
       <section className="panel">
-        <div className="tab-bar" role="tablist">
+        <div className="tab-bar">
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'received'}
             className={`tab-button ${activeTab === 'received' ? 'active' : ''}`}
             onClick={() => setActiveTab('received')}
           >
@@ -99,8 +97,6 @@ export default function FeedbackPage() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === 'given'}
             className={`tab-button ${activeTab === 'given' ? 'active' : ''}`}
             onClick={() => setActiveTab('given')}
           >

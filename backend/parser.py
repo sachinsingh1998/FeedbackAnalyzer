@@ -23,7 +23,6 @@ def _normalize_zid(value: str | None) -> str | None:
     cleaned = _normalize(value)
     if not cleaned or cleaned == "0":
         return None
-    # Master list uses z5512745; peer forms often use 5512745
     if cleaned.lower().startswith("z"):
         cleaned = cleaned[1:]
     cleaned = cleaned.strip()
@@ -99,7 +98,6 @@ class ParsedData:
 
 
 def parse_master_list(content: bytes) -> tuple[dict[str, dict], dict[str, dict]]:
-    """Return (zid_to_student, groups seeded from Current Group)."""
     text = _decode_csv(content)
     reader = csv.DictReader(io.StringIO(text))
     headers = reader.fieldnames or []
@@ -209,7 +207,6 @@ def apply_peer_evaluation(
         group = groups[group_name]
         reviewer_name = master.get("name") or (_normalize(row.get(name_col)) if name_col else None)
 
-        # Official member — mark submission using master details
         member = group["members"][reviewer_zid]
         member["submitted"] = True
         if reviewer_name:
@@ -232,9 +229,7 @@ def apply_peer_evaluation(
             if target_zid in official_zids:
                 group["feedback_received"].setdefault(target_zid, []).append(review)
             else:
-                # Mistyped / foreign zID — keep under unidentified for this group
                 if target_zid not in group["unidentified_members"]:
-                    # Prefer master name if this zID belongs to another group
                     other = zid_to_student.get(target_zid)
                     group["unidentified_members"][target_zid] = {
                         "zid": target_zid,
@@ -266,10 +261,3 @@ def parse_with_master_list(
     parsed = apply_peer_evaluation(peer_content, zid_to_student, groups, peer_filename)
     parsed.master_filename = master_filename
     return parsed
-
-
-# Backwards-compatible alias used by older call sites / tests
-def parse_csv_content(content: bytes, filename: str = "upload.csv") -> ParsedData:
-    raise ValueError(
-        "Peer evaluation alone is no longer supported. Upload both the peer evaluation CSV and the master list CSV."
-    )
