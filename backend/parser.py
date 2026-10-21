@@ -1,6 +1,8 @@
 import csv
 import io
 import re
+import zipfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
 
@@ -40,34 +42,48 @@ def _find_column(headers: list[str], *needles: str) -> str | None:
     return None
 
 
-def _member_block_columns(headers: list[str], member_index: int) -> dict[str, str | None]:
-    suffix = "" if member_index == 1 else str(member_index)
-    zid_needle = f"team member {member_index}"
+def _trailing_number(header: str) -> str | None:
+    match = re.search(r"(\d+)$", header)
+    return match.group(1) if match else None
 
-    zid_col = _find_column(headers, zid_needle)
+
+def _uses_forms_repeat_suffix(headers: list[str]) -> bool:
+    # Microsoft Forms numbers repeated questions from 1 on the second copy:
+    # member 1 has no suffix, member 2 ends in 1, member 3 ends in 2, and so on.
+    for header in headers:
+        lower = header.lower()
+        if "rate" in lower and "participation" in lower and _trailing_number(header) == "1":
+            return True
+    return False
+
+
+def _column_for(headers: list[str], label: str, kind: str, suffix: str | None) -> str | None:
+    for header in headers:
+        lower = header.lower()
+        if label not in lower or kind not in lower:
+            continue
+        if _trailing_number(header) == suffix:
+            return header
+    return None
+
+
+def _member_block_columns(headers: list[str], member_index: int, forms_style: bool) -> dict[str, str | None]:
+    if member_index == 1:
+        suffix = None
+    elif forms_style:
+        suffix = str(member_index - 1)
+    else:
+        suffix = str(member_index)
+
+    zid_pattern = re.compile(rf"team member {member_index}(?!\d)", re.IGNORECASE)
+    zid_col = next((header for header in headers if zid_pattern.search(header)), None)
     if not zid_col:
         return {}
 
     result: dict[str, str | None] = {"zid": zid_col}
     for key, label in CRITERIA:
-        rating_col = None
-        comment_col = None
-        for header in headers:
-            header_lower = header.lower()
-            if label in header_lower and "rate" in header_lower:
-                if suffix:
-                    if header.endswith(suffix) or header_lower.endswith(suffix.lower()):
-                        rating_col = header
-                elif not re.search(r"\d$", header):
-                    rating_col = header
-            if label in header_lower and "comment" in header_lower:
-                if suffix:
-                    if header.endswith(suffix) or header_lower.endswith(suffix.lower()):
-                        comment_col = header
-                elif not re.search(r"\d$", header):
-                    comment_col = header
-        result[f"{key}_rating"] = rating_col
-        result[f"{key}_comment"] = comment_col
+        result[f"{key}_rating"] = _column_for(headers, label, "rate", suffix)
+        result[f"{key}_comment"] = _column_for(headers, label, "comment", suffix)
     return result
 
 
@@ -78,6 +94,161 @@ def _decode_csv(content: bytes) -> str:
         except UnicodeDecodeError:
             continue
     return content.decode("latin-1", errors="replace")
+
+
+def _csv_reader(text: str) -> csv.DictReader:
+    # newline="" lets the csv module handle CR, LF, and CRLF itself.
+    # StringIO's default splits only on LF, so a Mac/Excel CR-only export
+    # raises "new-line character seen in unquoted field".
+    return csv.DictReader(io.StringIO(text, newline=""))
+
+
+def _clean_header(value: str | None) -> str:
+    if not value:
+        return ""
+    return value.replace("\xa0", " ").replace("\u200b", "").strip()
+
+
+def _is_xlsx(content: bytes) -> bool:
+    return content[:2] == b"PK"
+
+
+_XLSX_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_XLSX_REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+_PKG_REL_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+
+
+def _shared_strings(archive: zipfile.ZipFile) -> list[str]:
+    if "xl/sharedStrings.xml" not in archive.namelist():
+        return []
+    root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
+    strings: list[str] = []
+    for item in root.findall(f"{_XLSX_NS}si"):
+        direct = item.find(f"{_XLSX_NS}t")
+        if direct is not None:
+            strings.append(direct.text or "")
+            continue
+        parts = []
+        for run in item.findall(f"{_XLSX_NS}r"):
+            text = run.find(f"{_XLSX_NS}t")
+            if text is not None and text.text:
+                parts.append(text.text)
+        strings.append("".join(parts))
+    return strings
+
+
+def _column_index(cell_ref: str) -> int:
+    index = 0
+    for char in cell_ref:
+        if char.isdigit():
+            break
+        index = index * 26 + (ord(char.upper()) - 64)
+    return index - 1
+
+
+def _excel_number(raw: str) -> str:
+    if re.fullmatch(r"-?\d+", raw):
+        return raw
+    if re.fullmatch(r"-?\d+\.0+", raw):
+        return str(int(float(raw)))
+    return raw
+
+
+def _cell_value(cell: ET.Element, strings: list[str]) -> str | None:
+    cell_type = cell.attrib.get("t")
+    if cell_type == "inlineStr":
+        parts = [node.text or "" for node in cell.iter(f"{_XLSX_NS}t")]
+        return "".join(parts) or None
+    value = cell.find(f"{_XLSX_NS}v")
+    if value is None or value.text is None:
+        return None
+    raw = value.text
+    if cell_type == "s":
+        index = int(raw)
+        return strings[index] if 0 <= index < len(strings) else raw
+    if cell_type == "b":
+        return "TRUE" if raw == "1" else "FALSE"
+    if cell_type in (None, "n"):
+        return _excel_number(raw)
+    return raw
+
+
+def _first_sheet_path(archive: zipfile.ZipFile) -> str:
+    workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+    sheet = workbook.find(f"{_XLSX_NS}sheets/{_XLSX_NS}sheet")
+    if sheet is None:
+        raise ValueError("The Excel file has no sheets.")
+    rel_id = sheet.attrib.get(f"{_XLSX_REL_NS}id")
+    if rel_id and "xl/_rels/workbook.xml.rels" in archive.namelist():
+        rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+        for rel in rels:
+            if rel.attrib.get("Id") != rel_id:
+                continue
+            target = rel.attrib.get("Target", "")
+            target = target.lstrip("/")
+            if target.startswith("xl/"):
+                return target
+            return f"xl/{target}"
+    return "xl/worksheets/sheet1.xml"
+
+
+def _read_xlsx(content: bytes) -> tuple[list[str], list[dict[str, str | None]]]:
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile as exc:
+        raise ValueError("Could not read the Excel file.") from exc
+
+    strings = _shared_strings(archive)
+    try:
+        sheet_xml = archive.read(_first_sheet_path(archive))
+    except KeyError as exc:
+        raise ValueError("The Excel file has no worksheet.") from exc
+
+    sheet = ET.fromstring(sheet_xml)
+    grid: list[dict[int, str | None]] = []
+    for row in sheet.iter(f"{_XLSX_NS}row"):
+        cells: dict[int, str | None] = {}
+        for cell in row.findall(f"{_XLSX_NS}c"):
+            cells[_column_index(cell.attrib.get("r", "A"))] = _cell_value(cell, strings)
+        if any(value not in (None, "") for value in cells.values()):
+            grid.append(cells)
+    if not grid:
+        raise ValueError("The Excel file is empty.")
+
+    width = max(grid[0])
+    headers = [_clean_header(grid[0].get(index)) for index in range(width + 1)]
+    rows: list[dict[str, str | None]] = []
+    for cells in grid[1:]:
+        record: dict[str, str | None] = {}
+        for index, header in enumerate(headers):
+            if header and header not in record:
+                record[header] = cells.get(index)
+        rows.append(record)
+    return [header for header in headers if header], rows
+
+
+def _read_csv_table(content: bytes) -> tuple[list[str], list[dict[str, str | None]]]:
+    reader = _csv_reader(_decode_csv(content))
+    raw_headers = list(reader.fieldnames or [])
+    headers = [_clean_header(header) for header in raw_headers]
+    rows: list[dict[str, str | None]] = []
+    for source in reader:
+        record: dict[str, str | None] = {}
+        for raw_header, header in zip(raw_headers, headers):
+            if header and header not in record:
+                record[header] = source.get(raw_header)
+        rows.append(record)
+    unique_headers = []
+    for header in headers:
+        if header and header not in unique_headers:
+            unique_headers.append(header)
+    return unique_headers, rows
+
+
+def _read_table(content: bytes) -> tuple[list[str], list[dict[str, str | None]]]:
+    if _is_xlsx(content):
+        return _read_xlsx(content)
+    return _read_csv_table(content)
 
 
 def _empty_group() -> dict:
@@ -98,9 +269,7 @@ class ParsedData:
 
 
 def parse_master_list(content: bytes) -> tuple[dict[str, dict], dict[str, dict]]:
-    text = _decode_csv(content)
-    reader = csv.DictReader(io.StringIO(text))
-    headers = reader.fieldnames or []
+    headers, rows = _read_table(content)
 
     zid_col = _find_column(headers, "zid")
     first_col = _find_column(headers, "first name")
@@ -114,7 +283,7 @@ def parse_master_list(content: bytes) -> tuple[dict[str, dict], dict[str, dict]]
     zid_to_student: dict[str, dict] = {}
     groups: dict[str, dict] = {}
 
-    for row in reader:
+    for row in rows:
         zid = _normalize_zid(row.get(zid_col))
         group_name = _normalize(row.get(group_col))
         if not zid or not group_name:
@@ -179,10 +348,9 @@ def apply_peer_evaluation(
     groups: dict[str, dict],
     peer_filename: str = "peer.csv",
 ) -> ParsedData:
-    text = _decode_csv(peer_content)
-    reader = csv.DictReader(io.StringIO(text))
-    headers = reader.fieldnames or []
-    member_blocks = [_member_block_columns(headers, i) for i in range(1, 6)]
+    headers, rows = _read_table(peer_content)
+    forms_style = _uses_forms_repeat_suffix(headers)
+    member_blocks = [_member_block_columns(headers, i, forms_style) for i in range(1, 6)]
 
     zid_col = _find_column(headers, "what is your zid", "zid")
     name_col = _find_column(headers, "name")
@@ -193,7 +361,7 @@ def apply_peer_evaluation(
     parsed = ParsedData(groups=groups, peer_filename=peer_filename)
     unmatched = 0
 
-    for row in reader:
+    for row in rows:
         reviewer_zid = _normalize_zid(row.get(zid_col))
         if not reviewer_zid:
             continue
