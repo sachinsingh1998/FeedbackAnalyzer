@@ -9,13 +9,13 @@ function FilePicker({ label, hint, file, onChange }) {
     <label className="file-dropzone">
       <input
         type="file"
-        accept=".csv"
+        accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={(event) => onChange(event.target.files?.[0] || null)}
       />
       <div className="file-dropzone-content">
         <p className="file-label-title">{label}</p>
         <p className="file-title">
-          {file ? file.name : 'Drop CSV file here or click to browse'}
+          {file ? file.name : 'Drop CSV or Excel file here or click to browse'}
         </p>
         <p className="file-hint">{hint}</p>
       </div>
@@ -63,7 +63,7 @@ export default function UploadPage() {
         <form onSubmit={handleUpload} className="upload-form">
           <FilePicker
             label="1. Peer evaluation CSV"
-            hint="Microsoft Forms export"
+            hint="Microsoft Forms Excel or CSV export"
             file={peerFile}
             onChange={(file) => {
               setPeerFile(file)

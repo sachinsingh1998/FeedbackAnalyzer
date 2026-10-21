@@ -1,5 +1,8 @@
+import asyncio
 import os
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, Any
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -17,6 +20,11 @@ from models import (
 from parser import parse_with_master_list
 
 CRITERIA_KEYS = ("participation", "dependability", "wellbeing", "work_contribution")
+
+# Parsing is CPU-heavy and private to each upload. Keep it off the request
+# thread pool so one tutor's Excel file does not stall everyone else's browsing.
+_parse_pool = ThreadPoolExecutor(max_workers=max(4, min(8, os.cpu_count() or 4)), thread_name_prefix="parse")
+_sessions_lock = threading.Lock()
 
 
 def _score_from_rating(rating: str | None) -> float | None:
@@ -84,19 +92,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Each tutor's upload lives only in their own session. Nothing is written to disk
+# and nothing is reused for a later upload.
 SESSIONS: dict[str, Any] = {}
 
 
 def _get_session(session_id: str) -> dict[str, Any]:
-    session = SESSIONS.get(session_id)
+    with _sessions_lock:
+        session = SESSIONS.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found. Please upload the CSV files again.")
     return session
 
 
 def _require_csv(file: UploadFile, label: str) -> None:
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail=f"Please upload a CSV file for {label}.")
+    name = (file.filename or "").lower()
+    if not name.endswith((".csv", ".xlsx")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Please upload a CSV or Excel file for {label}.",
+        )
 
 
 @app.get("/api/health")
@@ -119,12 +134,17 @@ async def upload_csv(
     if not master_content:
         raise HTTPException(status_code=400, detail="The master list file is empty.")
 
+    peer_filename = peer_file.filename or "peer.csv"
+    master_filename = master_file.filename or "master.csv"
+
     try:
-        parsed = parse_with_master_list(
+        parsed = await asyncio.get_running_loop().run_in_executor(
+            _parse_pool,
+            parse_with_master_list,
             peer_content,
             master_content,
-            peer_filename=peer_file.filename or "peer.csv",
-            master_filename=master_file.filename or "master.csv",
+            peer_filename,
+            master_filename,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -143,12 +163,13 @@ async def upload_csv(
     )
     display_name = f"{parsed.peer_filename} + {parsed.master_filename}"
 
-    SESSIONS[session_id] = {
-        "filename": display_name,
-        "peer_filename": parsed.peer_filename,
-        "master_filename": parsed.master_filename,
-        "groups": parsed.groups,
-    }
+    with _sessions_lock:
+        SESSIONS[session_id] = {
+            "filename": display_name,
+            "peer_filename": parsed.peer_filename,
+            "master_filename": parsed.master_filename,
+            "groups": parsed.groups,
+        }
 
     return UploadResponse(
         session_id=session_id,
